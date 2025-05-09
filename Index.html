@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Astro's Roulette</title>
+  <style>
+    body {
+      background: #0b0f1a;
+      color: #ffffff;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      color: #00ffcc;
+      margin-bottom: 10px;
+    }
+
+    select, button {
+      margin: 10px;
+      padding: 10px 15px;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: none;
+      background: #1a1a2e;
+      color: #00ffcc;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+
+    button:hover {
+      background: #00ffcc;
+      color: #0b0f1a;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+      gap: 12px;
+      max-width: 700px;
+      margin: 30px auto;
+    }
+
+    .champion {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 2px solid white;
+      filter: grayscale(100%);
+      transition: filter 0.2s ease;
+    }
+
+    .champion.active {
+      filter: grayscale(0%);
+      border: 2px solid #00ffcc;
+      box-shadow: 0 0 10px #00ffcc;
+    }
+
+    .result {
+      margin-top: 20px;
+      font-size: 1.3rem;
+      color: #00ffcc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Astro's Roulette</h1>
+
+  <label for="role">Select Role:</label>
+  <select id="role">
+    <option value="all">All</option>
+    <option value="top">Top</option>
+    <option value="jgl">Jungle</option>
+    <option value="mid">Mid</option>
+    <option value="adc">ADC</option>
+    <option value="supp">Support</option>
+  </select>
+  <button onclick="spin()">Spin</button>
+  <button onclick="openPoolSelector()">My Champion Pool</button>
+    <!-- Champion Pool Selector View -->
+    <div id="poolSelector" style="display:none;">
+        <h2>Select Your Champion Pool</h2>
+        <div class="grid" id="poolGrid"></div>
+        <button onclick="savePool()">Save Pool</button>
+        <button onclick="closePoolSelector()">Cancel</button>
+        <button onclick="resetPool()">Reset Pool</button>
+
+    </div>
+
+  <div class="grid" id="championGrid"></div>
+
+  <div class="result" id="result">🎯 Your champion will appear here!</div>
+
+  <script>
+    let userPool = null; 
+    
+    const IMG_URL = "https://ddragon.leagueoflegends.com/cdn/15.9.1/img/champion/";
+
+    // Champion name overrides for image lookup
+    const nameMap = {
+        "Wukong": "MonkeyKing",
+        "MaitreYi": "MasterYi"
+    };
+    // Converted from your Champions.py list
+    const ALL_CHAMPIONS = [
+      { name: "Aatrox", role: ["top"] },
+      { name: "Ahri", role: ["mid"] },
+      { name: "Akali", role: ["mid", "top"] },
+      { name: "Akshan", role: ["top", "mid"] },
+      { name: "Alistar", role: ["supp"] },
+      { name: "Ambessa", role: ["mid"] },
+      { name: "Amumu", role: ["jgl", "supp"] },
+      { name: "Annie", role: ["mid", "supp"] },
+      { name: "Aphelios", role: ["adc"] },
+      { name: "Ashe", role: ["adc"] },
+      { name: "AurelionSol", role: ["mid"] },
+      { name: "Aurora", role: ["mid","top"] },
+      { name: "Azir", role: ["mid"] },
+      { name: "Bard", role: ["supp"] },
+      { name: "Belveth", role: ["jgl"] },
+      { name: "Blitzcrank", "role":["supp"], "class":"Support", "speciality": ["Catcher"] , "damage": ["low"], "range": "melee"},
+      { name: "Braum", "role":["supp"], "class":"Support", "speciality": ["Warden"] , "damage": ["low"], "range": "melee"},
+      { name: "Briar", "role":["jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Caitlyn", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Camille", "role":["top"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Cassiopeia", "role":["mid"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Chogath", "role":["top"], "class":"Tank", "speciality": ["Warden"] , "damage": ["ap","low"], "range": "melee"},
+      { name: "Corki", "role":["mid"], "class":"Mage", "speciality": ["Poke"] , "damage": ["ap","ad"], "range": "range"},
+      { name: "Darius", "role":["top"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Diana", "role":["jgl"], "class":"Bruiser", "speciality": ["Vanguard"] , "damage": ["ap"], "range": "melee"},
+      { name: "DrMundo", "role":["top"], "class":"Tank", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Draven", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Ekko", "role":["jgl","mid"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ap"], "range": "melee"},
+      { name: "Elise", "role":["jgl"], "class":"Assassin", "speciality": ["Diver"] , "damage": ["ap"], "range": "range"},
+      { name: "Evelynn", "role":["jgl"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ap"], "range": "melee"},
+      { name: "Ezreal", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad","ap"], "range": "range"},
+      { name: "Fiddlesticks", "role":["jgl"], "class":"Mage", "speciality": ["Catcher"] , "damage": ["ap"], "range": "range"},
+      { name: "Fiora", "role":["top"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Fizz", "role":["mid"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ap"], "range": "melee"},
+      { name: "Galio", "role":["mid","supp"], "class":"Mage", "speciality": ["Warden"] , "damage": ["ap"], "range": "melee"},
+      { name: "Gangplank", "role":["top"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Garen", "role":["top"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Gnar", "role":["top"], "class":"Bruiser", "speciality": ["Vanguard"] , "damage": ["ad"], "range": "range"},
+      { name: "Gragas", "role":["jgl","mid"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ap"], "range": "melee"},
+      { name: "Graves", "role":["jgl"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "range"},
+      { name: "Gwen", "role":["top"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ap"], "range": "melee"},
+      { name: "Hecarim", "role":["jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Heimerdinger", "role":["supp"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Hwei", "role":["mid","supp"], "class":"Mage", "speciality": ["Poke","Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Illaoi", "role":["top"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Irelia", "role":["top","mid"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Ivern", "role":["jgl"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Janna", "role":["supp"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap","low"], "range": "range"},
+      { name: "JarvanIV", "role":["jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Jax", "role":["top"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Jayce", "role":["top","mid"], "class":"Bruiser", "speciality": ["Poke"] , "damage": ["ad"], "range": "range"},
+      { name: "Jhin", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Jinx", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "KSante", "role":["top"], "class":"Tank", "speciality": ["Warden","Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Kaisa", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad","ap"], "range": "range"},
+      { name: "Kalista", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Karma", "role":["supp"], "class":"Support", "speciality": ["Enchanter","Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Karthus", "role":["jgl"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Kassadin", "role":["mid"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ap"], "range": "melee"},
+      { name: "Katarina", "role":["mid"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ap"], "range": "melee"},
+      { name: "Kayle", "role":["top"], "class":"Bruiser", "speciality": ["Marksman"] , "damage": ["ad","ap"], "range": "range"},
+      { name: "Kayn", "role":["jgl"], "class":"Assassin", "speciality": ["Skirmisher","Assassin"] , "damage": ["ad"], "range": "melee"},
+      { name: "Kennen", "role":["top"], "class":"Mage", "speciality": ["Battlemage", "catcher"] , "damage": ["ap"], "range": "range"},
+      { name: "Khazix", "role":["jgl"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ad"], "range": "melee"},
+      { name: "Kindred", "role":["jgl"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Kled", "role":["top"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "KogMaw", "role":["adc"], "class":"Marksman", "speciality": ["Poke","Marksman"] , "damage": ["ad","ap"], "range": "range"},
+      { name: "Leblanc", "role":["mid"], "class":"Assassin", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "LeeSin", "role":["jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Leona", "role":["supp"], "class":"Support", "speciality": ["Vanguard"] , "damage": ["low"], "range": "melee"},
+      { name: "Lillia", "role":["jgl"], "class":"Mage", "speciality": ["Skirmisher"] , "damage": ["ap"], "range": "melee"},
+      { name: "Lissandra", "role":["mid"], "class":"Mage", "speciality": ["Burst", "Catcher"] , "damage": ["ap"], "range": "range"},
+      { name: "Lucian", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Lulu", "role":["supp"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Lux", "role":["supp","mid"], "class":"Support", "speciality": ["Burst","Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "MaitreYi", "role":["jgl"], "class":"Assassin", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Malphite", "role":["top"], "class":"Tank", "speciality": ["Vanguard"] , "damage": ["ap"], "range": "melee"},
+      { name: "Malzahar", "role":["mid"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Mel", role: ["mid", "adc"] },
+      { name: "Maokai", "role":["jgl","supp"], "class":"Support", "speciality": ["Catcher","Vanguard"] , "damage": ["ap"], "range": "melee"},
+      { name: "Milio", "role":["supp"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["low"], "range": "range"},
+      { name: "MissFortune", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad","ap"], "range": "range"},
+      { name: "Mordekaiser", "role":["top"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ap"], "range": "melee"},
+      { name: "Morgana", "role":["supp"], "class":"Support", "speciality": ["Catcher","Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Naafiri", "role":["mid"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ad"], "range": "melee"},
+      { name: "Nami", "role":["supp"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Nasus", "role":["top"], "class":"Tank", "speciality": ["Juggernaut"] , "damage": ["ad","ap"], "range": "melee"},
+      { name: "Nautilus", "role":["supp"], "class":"Support", "speciality": ["Vanguard","Catcher"] , "damage": ["low"], "range": "melee"},
+      { name: "Neeko", "role":["supp","mid"], "class":"Mage", "speciality": ["Catcher","Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Nidalee", "role":["jgl"], "class":"Assassin", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Nilah", "role":["adc"], "class":"Marksman", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "range"},
+      { name: "Nocturne", "role":["jgl"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Nunu", "role":["jgl"], "class":"Tank", "speciality": ["Vanguard"] , "damage": ["ap"], "range": "melee"},
+      { name: "Olaf", "role":["top","jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Orianna", "role":["mid"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Ornn", "role":["top"], "class":"Tank", "speciality": ["Vanguard"] , "damage": ["ad","ap"], "range": "melee"},
+      { name: "Pantheon", "role":["top","jgl"], "class":"Assassin", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Poppy", "role":["top","jgl"], "class":"Tank", "speciality": ["Warden"] , "damage": ["ad"], "range": "melee"},
+      { name: "Pyke", "role":["supp"], "class":"Assassin", "speciality": ["Assassin","Catcher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Qiyana", "role":["mid"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ad"], "range": "melee"},
+      { name: "Quinn", "role":["top"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Rakan", "role":["supp"], "class":"Support", "speciality": ["Catcher"] , "damage": ["low"], "range": "melee"},
+      { name: "Rammus", "role":["jgl"], "class":"Tank", "speciality": ["Vanguard"] , "damage": ["ap"], "range": "melee"},
+      { name: "RekSai", "role":["jgl"], "class":"Assassin", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Rell", "role":["jgl","supp"], "class":"Support", "speciality": ["Catcher","Vanguard"] , "damage": ["low"], "range": "melee"},
+      { name: "Renata", "role":["supp"], "class":"Support", "speciality":["Enchanteur"], "damage": ["ap"], "range": "range"},
+      { name: "Renekton", "role":["top"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Rengar", "role":["top","jgl"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ad"], "range": "melee"},
+      { name: "Riven", "role":["top"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Rumble", "role":["top"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "melee"},
+      { name: "Ryze", "role":["mid"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Samira", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Sejuani", "role":["jgl"], "class":"Support", "speciality": ["Catcher","Vanguard"] , "damage": ["low"], "range": "melee"},
+      { name: "Senna", "role":["adc","supp"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Seraphine", "role":["supp","adc","mid"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Sett", "role":["top","supp"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Shaco", "role":["jgl"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ad","ap"], "range": "melee"},
+      { name: "Shen", "role":["top"], "class":"Tank", "speciality": ["Warden"] , "damage": ["ad"], "range": "melee"},
+      { name: "Shyvana", "role":["jgl"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ap","ad"], "range": "melee"},
+      { name: "Singed", "role":["top"], "class":"Tank", "speciality": ["Warden"] , "damage": ["ap"], "range": "melee"},
+      { name: "Sion", "role":["top"], "class":"Tank", "speciality": ["Vanguard"] , "damage": ["ad"], "range": "melee"},
+      { name: "Sivir", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Skarner", "role":["jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Smolder", "role":["adc","mid"], "class":"Marksman", "speciality":["Marksman"], "damage": ["ad"], "range": "range"},
+      { name: "Sona", "role":["supp"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Soraka", "role":["supp"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Swain", "role":["supp","mid"], "class":"Bruiser", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Sylas", "role":["mid","supp"], "class":"Mage", "speciality": ["Burst","Skirmisher"] , "damage": ["ap"], "range": "melee"},
+      { name: "Syndra", "role":["mid"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "TahmKench", "role":["supp","top"], "class":"Tank", "speciality": ["Warden"] , "damage": ["ad"], "range": "melee"},
+      { name: "Taliyah", "role":["mid","jgl"], "class":"Mage", "speciality": ["Battlemage","Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Talon", "role":["mid","jgl"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ad"], "range": "melee"},
+      { name: "Taric", "role":["supp"], "class":"Support", "speciality": ["Warden","Enchanter"] , "damage": ["low"], "range": "melee"},
+      { name: "Teemo", "role":["top","jgl"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Thresh", "role":["supp"], "class":"Support", "speciality": ["Catcher"] , "damage": ["low"], "range": "range"},
+      { name: "Tristana", "role":["adc","mid"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Trundle", "role":["top","jgl"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Tryndamere", "role":["top"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "TwistedFate", "role":["mid"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ad","ap"], "range": "range"},
+      { name: "Twitch", "role":["adc","jgl"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad","ap"], "range": "range"},
+      { name: "Udyr", "role":["top","jgl"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ap","ad"], "range": "melee"},
+      { name: "Urgot", "role":["top"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "range"},
+      { name: "Varus", "role":["adc"], "class":"Marksman", "speciality": ["Marksman","Poke"] , "damage": ["ad","ap"], "range": "range"},
+      { name: "Vayne", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Veigar", "role":["mid"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Velkoz", "role":["mid","supp"], "class":"Mage", "speciality": ["Poke"] , "damage": ["ap"], "range": "range"},
+      { name: "Vex", "role":["mid"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Vi", "role":["jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Viego", "role":["jgl"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Vladimir", "role":["mid","top"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Viktor", "role":["mid"], "class":"Mage", "speciality": ["Battlemage"] , "damage": ["ap"], "range": "range"},
+      { name: "Brand", "role":["jgl","supp"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Volibear", "role":["top","jgl"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ap"], "range": "melee"},
+      { name: "Warwick", "role":["top","jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Wukong", "role":["top","jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Xayah", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Xerath", "role":["mid","supp"], "class":"Mage", "speciality": ["Poke"] , "damage": ["ap"], "range": "range"},
+      { name: "XinZhao", "role":["jgl"], "class":"Bruiser", "speciality": ["Diver"] , "damage": ["ad"], "range": "melee"},
+      { name: "Yasuo", "role":["top","mid"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Yone", "role":["top","mid"], "class":"Bruiser", "speciality": ["Skirmisher"] , "damage": ["ad"], "range": "melee"},
+      { name: "Yorick", "role":["top"], "class":"Bruiser", "speciality": ["Juggernaut"] , "damage": ["ad"], "range": "melee"},
+      { name: "Yuumi", "role":["supp"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Zac", "role":["top","jgl"], "class":"Tank", "speciality": ["Vanguard"] , "damage": ["ap"], "range": "melee"},
+      { name: "Zed", "role":["mid"], "class":"Assassin", "speciality": ["Assassin"] , "damage": ["ad"], "range": "melee"},
+      { name: "Zeri", "role":["adc"], "class":"Marksman", "speciality": ["Marksman"] , "damage": ["ad"], "range": "range"},
+      { name: "Ziggs", "role":["adc","mid"], "class":"Mage", "speciality": ["Poke"] , "damage": ["ap"], "range": "range"},
+      { name: "Zilean", "role":["supp"], "class":"Support", "speciality": ["Enchanter"] , "damage": ["ap"], "range": "range"},
+      { name: "Zoe", "role":["mid"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      { name: "Zyra", "role":["supp"], "class":"Mage", "speciality": ["Burst"] , "damage": ["ap"], "range": "range"},
+      
+      
+     
+      
+    ];
+  
+    function getImageName(name) {
+    return nameMap[name] || name;
+    }
+
+    function filterByRole(role) {
+      let pool = ALL_CHAMPIONS;
+
+      // If a user-defined pool exists, filter ALL_CHAMPIONS by it first
+      if (userPool && Array.isArray(userPool)) {
+        pool = ALL_CHAMPIONS.filter(champ => userPool.includes(champ.name));
+      }
+
+      if (role === "all") return pool;
+      return pool.filter(champ => champ.role.includes(role));
+    }
+
+
+    function openPoolSelector() {
+        document.getElementById("poolSelector").style.display = "block";
+        document.getElementById("championGrid").style.display = "none";
+        document.getElementById("result").style.display = "none";
+        renderPoolGrid();
+    }
+
+    function closePoolSelector() {
+        document.getElementById("poolSelector").style.display = "none";
+        document.getElementById("championGrid").style.display = "grid";
+        document.getElementById("result").style.display = "block";
+    }
+
+    function resetPool() {
+        userPool = null;
+        updateGrid();
+        document.getElementById("result").textContent = "🎯 Your champion will appear here!";
+        renderPoolGrid();
+        closePoolSelector();
+    }
+
+
+
+
+    function renderPoolGrid() {
+    const grid = document.getElementById("poolGrid");
+    grid.innerHTML = "";
+
+    ALL_CHAMPIONS.forEach((champ) => {
+        const img = document.createElement("img");
+        img.src = `${IMG_URL}${getImageName(champ.name)}.png`;
+        img.className = "champion";
+        img.title = champ.name;
+
+        // Mark as selected if already in pool
+        if (userPool && userPool.includes(champ.name)) {
+        img.classList.add("active");
+        }
+
+        img.onclick = () => {
+        img.classList.toggle("active");
+        };
+
+        grid.appendChild(img);
+    });
+    }
+
+    function savePool() {
+        const selected = [...document.querySelectorAll("#poolGrid .champion.active")]
+            .map(img => img.title);
+        
+        userPool = selected;
+        closePoolSelector();
+        updateGrid(); // Make sure it re-renders the grid for the pool
+    }
+
+
+
+    function updateGrid() {
+        const role = document.getElementById("role").value;
+        const pool = filterByRole(role);
+        const grid = document.getElementById("championGrid");
+        grid.innerHTML = "";
+
+        pool.forEach((champ) => {
+            const img = document.createElement("img");
+            img.src = `${IMG_URL}${getImageName(champ.name)}.png`;
+            img.className = "champion";
+            img.title = champ.name;
+            grid.appendChild(img);
+        });
+
+        // Reset result
+        document.getElementById("result").textContent = "🎯 Your champion will appear here!";
+    }
+
+
+    async function spin() {
+        const role = document.getElementById("role").value;
+        const pool = filterByRole(role);
+        const icons = document.querySelectorAll(".champion");
+
+        if (icons.length === 0) {
+            document.getElementById("result").textContent = "⚠️ No champions available in this pool.";
+            return;
+        }
+
+        icons.forEach(icon => icon.classList.remove("active"));
+        document.getElementById("result").textContent = "Spinning...";
+
+        // Create a randomized index list
+        const spinCount = 20 + Math.floor(Math.random() * 10);
+        const randomIndexes = Array.from({ length: spinCount }, () =>
+            Math.floor(Math.random() * icons.length)
+        );
+
+        let delay = 100;
+        for (let i = 0; i < randomIndexes.length; i++) {
+            const idx = randomIndexes[i];
+
+            const prev = document.querySelector(".champion.active");
+            if (prev) prev.classList.remove("active");
+            icons[idx].classList.add("active");
+
+            await new Promise(res => setTimeout(res, delay));
+            delay += 8;
+        }
+
+        const finalIdx = randomIndexes[randomIndexes.length - 1];
+        const selectedChampion = icons[finalIdx].title;
+        document.getElementById("result").textContent = `🎯 Your champion is: ${selectedChampion}`;
+        }
+
+
+    document.getElementById("role").addEventListener("change", updateGrid);
+    updateGrid(); // Initialize
+</script>
+  
+  
+</body>
+</html>
