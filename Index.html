@@ -65,31 +65,82 @@
       font-size: 1.3rem;
       color: #00ffcc;
     }
+    .role-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    .role-buttons button {
+      background: none;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      padding: 4px;
+      cursor: pointer;
+      transition: border 0.2s;
+    }
+
+    .role-buttons button img {
+      width: 40px;
+      height: 40px;
+    }
+
+    .role-buttons button.active {
+      border-color: #00ffcc;
+      background-color: #1a1a2e;
+    }
+
+    #championInput {
+      width: 100%;
+      max-width: 500px;
+      padding: 8px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 2px solid #1a1a2e;
+      margin: 10px auto;
+      display: block;
+      background-color: #101525;
+      color: white;
+    }
+    button:disabled {
+      background-color: #444 !important;
+      color: #aaa !important;
+      cursor: not-allowed;
+      border: none;
+    }
+
+
   </style>
 </head>
 <body>
   <h1>Astro's Roulette</h1>
 
   <label for="role">Select Role:</label>
-  <select id="role">
-    <option value="all">All</option>
-    <option value="top">Top</option>
-    <option value="jgl">Jungle</option>
-    <option value="mid">Mid</option>
-    <option value="adc">ADC</option>
-    <option value="supp">Support</option>
-  </select>
+  <div id="roleButtons" class="role-buttons">
+    <button onclick="handleFilterClick('top')" id="btn-top"><img src="top.webp" alt="top"></button>
+    <button onclick="handleFilterClick('jgl')" id="btn-jgl"><img src="jgl.webp" alt="jgl"></button>
+    <button onclick="handleFilterClick('mid')" id="btn-mid"><img src="mid.webp" alt="mid"></button>
+    <button onclick="handleFilterClick('adc')" id="btn-adc"><img src="adc.webp" alt="adc"></button>
+    <button onclick="handleFilterClick('supp')" id="btn-supp"><img src="supp.webp" alt="supp"></button>
+  </div>
+  
+
   <button onclick="spin()">Spin</button>
   <button onclick="openPoolSelector()">My Champion Pool</button>
     <!-- Champion Pool Selector View -->
     <div id="poolSelector" style="display:none;">
-        <h2>Select Your Champion Pool</h2>
-        <div class="grid" id="poolGrid"></div>
-        <button onclick="savePool()">Save Pool</button>
-        <button onclick="closePoolSelector()">Cancel</button>
-        <button onclick="resetPool()">Reset Pool</button>
-
+      <h2>Select Your Champion Pool</h2>
+    
+      <textarea id="championInput" rows="3" placeholder="Enter champions like: Ahri, Alistar, Annie"></textarea>
+      <button onclick="parseChampionInput()">Parse Input</button>
+      <button onclick="savePool()">Save Pool</button>
+      <button onclick="closePoolSelector()">Cancel</button>
+      <button onclick="resetPool()">Reset Pool</button>
+      <div class="grid" id="poolGrid"></div>
+   
     </div>
+
 
   <div class="grid" id="championGrid"></div>
 
@@ -102,10 +153,9 @@
 
     // Champion name overrides for image lookup
     const nameMap = {
-        "Wukong": "MonkeyKing",
-        "MaitreYi": "MasterYi"
+      "Wukong": "MonkeyKing",
+      "MaitreYi": "MasterYi"
     };
-    // Converted from your Champions.py list
     const ALL_CHAMPIONS = [
       { name: "Aatrox", role: ["top"] },
       { name: "Ahri", role: ["mid"] },
@@ -283,7 +333,7 @@
     ];
   
     function getImageName(name) {
-    return nameMap[name] || name;
+      return nameMap[name] || name;
     }
 
     function filterByRole(role) {
@@ -300,27 +350,27 @@
 
 
     function openPoolSelector() {
-        document.getElementById("poolSelector").style.display = "block";
-        document.getElementById("championGrid").style.display = "none";
-        document.getElementById("result").style.display = "none";
-        renderPoolGrid();
+      document.getElementById("poolSelector").style.display = "block";
+      document.getElementById("championGrid").style.display = "none";
+      document.getElementById("result").style.display = "none";
+      document.querySelector('button[onclick="spin()"]').disabled = true;
+      renderPoolGrid();
     }
 
     function closePoolSelector() {
-        document.getElementById("poolSelector").style.display = "none";
-        document.getElementById("championGrid").style.display = "grid";
-        document.getElementById("result").style.display = "block";
+      document.getElementById("poolSelector").style.display = "none";
+      document.getElementById("championGrid").style.display = "grid";
+      document.getElementById("result").style.display = "block";
+      document.querySelector('button[onclick="spin()"]').disabled = false;
     }
 
     function resetPool() {
-        userPool = null;
-        updateGrid();
-        document.getElementById("result").textContent = "🎯 Your champion will appear here!";
-        renderPoolGrid();
-        closePoolSelector();
+      userPool = null;
+      updateGrid();
+      document.getElementById("result").textContent = "🎯 Your champion will appear here!";
+      renderPoolGrid();
+      closePoolSelector();
     }
-
-
 
 
     function renderPoolGrid() {
@@ -346,6 +396,36 @@
     });
     }
 
+    function parseChampionInput() {
+      const rawInput = document.getElementById("championInput").value;
+      if (!rawInput.trim()) return;
+
+      const inputNames = rawInput
+          .toLowerCase()
+          .split(/[\s,]+/)
+          .map(name => name.trim())
+          .filter(Boolean);
+
+      const validNames = ALL_CHAMPIONS.map(c => c.name.toLowerCase());
+      const matched = [];
+
+      // Go through input and match valid champion names (case-insensitive)
+      inputNames.forEach(input => {
+          const match = ALL_CHAMPIONS.find(c => c.name.toLowerCase() === input);
+          if (match) matched.push(match.name);
+      });
+
+      // Highlight matched champions in the pool grid
+      const gridIcons = document.querySelectorAll("#poolGrid .champion");
+      gridIcons.forEach(icon => {
+          if (matched.includes(icon.title)) {
+              icon.classList.add("active");
+          } else {
+              icon.classList.remove("active");
+          }
+      });
+    }
+
     function savePool() {
         const selected = [...document.querySelectorAll("#poolGrid .champion.active")]
             .map(img => img.title);
@@ -356,64 +436,78 @@
     }
 
 
+    let selectedRole = "all";
+
+    function handleFilterClick(role) {
+      if (selectedRole === role) {
+          selectedRole = "all";
+      } else {
+          selectedRole = role;
+      }
+      updateGrid();
+      updateActiveButton();
+    }
+
+    function updateActiveButton() {
+      document.querySelectorAll(".role-buttons button").forEach(btn => {
+          btn.classList.remove("active");
+      });
+
+      if (selectedRole !== "all") {
+          const btn = document.getElementById(`btn-${selectedRole}`);
+          if (btn) btn.classList.add("active");
+      }
+    }
 
     function updateGrid() {
-        const role = document.getElementById("role").value;
-        const pool = filterByRole(role);
-        const grid = document.getElementById("championGrid");
-        grid.innerHTML = "";
+      const role = selectedRole;
+      const pool = filterByRole(role);
+      const grid = document.getElementById("championGrid");
+      grid.innerHTML = "";
 
-        pool.forEach((champ) => {
-            const img = document.createElement("img");
-            img.src = `${IMG_URL}${getImageName(champ.name)}.png`;
-            img.className = "champion";
-            img.title = champ.name;
-            grid.appendChild(img);
-        });
+      pool.forEach((champ) => {
+          const img = document.createElement("img");
+          img.src = `${IMG_URL}${getImageName(champ.name)}.png`;
+          img.className = "champion";
+          img.title = champ.name;
+          grid.appendChild(img);
+      });
 
-        // Reset result
-        document.getElementById("result").textContent = "🎯 Your champion will appear here!";
+      // Reset result
+      document.getElementById("result").textContent = "🎯 Your champion will appear here!";
     }
 
 
     async function spin() {
-        const role = document.getElementById("role").value;
-        const pool = filterByRole(role);
-        const icons = document.querySelectorAll(".champion");
-
-        if (icons.length === 0) {
-            document.getElementById("result").textContent = "⚠️ No champions available in this pool.";
-            return;
-        }
-
-        icons.forEach(icon => icon.classList.remove("active"));
-        document.getElementById("result").textContent = "Spinning...";
-
-        // Create a randomized index list
-        const spinCount = 20 + Math.floor(Math.random() * 10);
-        const randomIndexes = Array.from({ length: spinCount }, () =>
-            Math.floor(Math.random() * icons.length)
-        );
-
-        let delay = 100;
-        for (let i = 0; i < randomIndexes.length; i++) {
-            const idx = randomIndexes[i];
-
-            const prev = document.querySelector(".champion.active");
-            if (prev) prev.classList.remove("active");
-            icons[idx].classList.add("active");
-
-            await new Promise(res => setTimeout(res, delay));
-            delay += 8;
-        }
-
-        const finalIdx = randomIndexes[randomIndexes.length - 1];
-        const selectedChampion = icons[finalIdx].title;
-        document.getElementById("result").textContent = `🎯 Your champion is: ${selectedChampion}`;
-        }
+      const icons = document.querySelectorAll("#championGrid .champion");
 
 
-    document.getElementById("role").addEventListener("change", updateGrid);
+      if (icons.length === 0) {
+          document.getElementById("result").textContent = "⚠️ No champions available in this pool.";
+          return;
+      }
+
+      icons.forEach(icon => icon.classList.remove("active"));
+      document.getElementById("result").textContent = "Spinning...";
+
+      const spinCount = 20 + Math.floor(Math.random() * 10);
+      let delay = 100;
+      let finalIdx = 0;
+
+      for (let i = 0; i < spinCount; i++) {
+          const idx = Math.floor(Math.random() * icons.length);
+          icons.forEach(icon => icon.classList.remove("active"));
+          icons[idx].classList.add("active");
+          finalIdx = idx;
+          await new Promise(res => setTimeout(res, delay));
+          delay += 8;
+      }
+
+      const selectedChampion = icons[finalIdx].title;
+      document.getElementById("result").textContent = `🎯 Your champion is: ${selectedChampion}`;
+    } 
+
+
     updateGrid(); // Initialize
 </script>
   
